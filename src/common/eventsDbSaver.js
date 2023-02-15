@@ -54,24 +54,28 @@ module.exports = class EventsDBSaver {
 
 	}
 
-	saveEvent(transaction, call) {
-		this.ContractCallsTable
-			.create({
+	async saveEvent(transaction, call) {
+		try {
+			await this.ContractCallsTable.create({
 				fromAddress: transaction.from,
 				toAddress: transaction.to,
 				transactionHash: transaction.hash,
 				methodName: call.method,
 				parameters: JSON.stringify(call.inputs),
-			})
-			.then((record) => console.log("EventsDBSaver: Method call was saved", call))
-			.catch((error) => console.log(error));
+			});
+
+			console.log("EventsDBSaver: Method call was saved", call);
+		}
+		catch (error) {
+			console.log(error);
+		}
 	}
 
-	findEvent(hash) {
-		return this.ContractCallsTable
-			.findOne({
-				where: { transactionHash: hash },
-			});
+	async findEvent(hash) {
+		let call = await this.ContractCallsTable.findOne({
+			where: { transactionHash: hash },
+		});		
+		return call; 
 	}
 }
 

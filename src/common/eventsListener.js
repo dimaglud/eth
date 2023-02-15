@@ -25,41 +25,34 @@ module.exports = class EventsListener {
         web3.eth.subscribe('logs', {
             address: this.contractAddress
         })
-        .on('data', function(event){
+        .on('data', async event => {
             //console.log('-------Event received-------');
             //console.log(event);
 
-            saver.findEvent(event.transactionHash)
-                .then((savedCall) => {
-                    if (savedCall) {
-                        // THIS DOES NOT WORK
-                        console.log("EventsListener: Event was already saved", savedCall);
+            let savedCall = await saver.findEvent(event.transactionHash);
+            if (savedCall) {
+                // THIS DOES NOT WORK
+                console.log("EventsListener: Event was already saved", savedCall);
+            }
+            else {
+                let tx = await web3.eth.getTransaction(event.transactionHash)
+                let isSaved = false;
+                for (let decoder of decoders) {
+                    const result = decoder.decodeData(tx.input);
+                    if (result.method) {
+                        await saver.saveEvent(tx, result);
+                        isSaved = true;
+                        break;
+                    }    
+                }
+
+                if (!isSaved) {
+                    const result = { 
+                        method: 'UNKNOWN'
                     }
-                    else {
-                        web3.eth.getTransaction(event.transactionHash)
-                            .then( function(tx){
-                                //console.log('-------Transaction-------');
-                                //console.log(tx);
-                
-                                let isSaved = false;
-                                for (let decoder of decoders) {
-                                    const result = decoder.decodeData(tx.input);
-                                    if (result.method) {
-                                        saver.saveEvent(tx, result);
-                                        isSaved = true;
-                                        break;
-                                    }    
-                                }
-                
-                                if (!isSaved) {
-                                    const result = { 
-                                        method: 'UNKNOWN'
-                                    }
-                                    saver.saveEvent(tx, result);
-                                }
-                            });            
-                    };
-                });
+                    await saver.saveEvent(tx, result);
+                }
+            };
         });
 
         console.log('LISTENING STARTED');

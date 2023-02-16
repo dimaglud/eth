@@ -54,6 +54,35 @@ module.exports = class EventsDBSaver {
 
 	}
 
+	async lock() {
+		let resFunc = null;
+		let prevAwaiter = this.awaiter;
+		this.awaiter = new Promise((resolve, reject) => {
+			resFunc = resolve;
+		});	
+
+		if (prevAwaiter) {
+			await prevAwaiter;
+		}
+		return resFunc;	
+	}
+
+	async checkAndSaveEvent(transaction, call) {
+		let pulse = await this.lock();
+
+		let addedEvent = await this.findEvent(transaction.hash);
+		if (!addedEvent) {
+			await this.saveEvent(transaction, call);
+
+			console.log("EventsDBSaver: Method call was saved", call);
+		}
+		else {
+			console.log("EventsDBSaver: Method call is already in DB", call);
+		}
+
+		pulse();
+	}
+	
 	async saveEvent(transaction, call) {
 		try {
 			await this.ContractCallsTable.create({
@@ -63,8 +92,6 @@ module.exports = class EventsDBSaver {
 				methodName: call.method,
 				parameters: JSON.stringify(call.inputs),
 			});
-
-			console.log("EventsDBSaver: Method call was saved", call);
 		}
 		catch (error) {
 			console.log(error);
@@ -72,10 +99,17 @@ module.exports = class EventsDBSaver {
 	}
 
 	async findEvent(hash) {
-		let call = await this.ContractCallsTable.findOne({
-			where: { transactionHash: hash },
-		});		
-		return call; 
+		try {
+			let call = await this.ContractCallsTable.findOne({
+				where: { transactionHash: hash },
+			});		
+
+			return call; 
+		}
+		catch (error) {
+			console.log(error);
+			return null; 
+		}
 	}
 }
 

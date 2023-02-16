@@ -26,33 +26,26 @@ module.exports = class EventsListener {
             address: this.contractAddress
         })
         .on('data', async event => {
-            //console.log('-------Event received-------');
-            //console.log(event);
+            console.log('-------Event received-------');
+            console.log(event);
 
-            let savedCall = await saver.findEvent(event.transactionHash);
-            if (savedCall) {
-                // THIS DOES NOT WORK
-                console.log("EventsListener: Event was already saved", savedCall);
+            let tx = await web3.eth.getTransaction(event.transactionHash)
+            let isSaved = false;
+            for (let decoder of decoders) {
+                const result = decoder.decodeData(tx.input);
+                if (result.method) {
+                    await saver.checkAndSaveEvent(tx, result);
+                    isSaved = true;
+                    break;
+                }    
             }
-            else {
-                let tx = await web3.eth.getTransaction(event.transactionHash)
-                let isSaved = false;
-                for (let decoder of decoders) {
-                    const result = decoder.decodeData(tx.input);
-                    if (result.method) {
-                        await saver.saveEvent(tx, result);
-                        isSaved = true;
-                        break;
-                    }    
-                }
 
-                if (!isSaved) {
-                    const result = { 
-                        method: 'UNKNOWN'
-                    }
-                    await saver.saveEvent(tx, result);
+            if (!isSaved) {
+                const result = { 
+                    method: 'UNKNOWN'
                 }
-            };
+                await saver.checkAndSaveEvent(tx, result);
+            }
         });
 
         console.log('LISTENING STARTED');
